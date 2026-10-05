@@ -1,0 +1,1079 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CYBER HUNTER: MISI KATA ADJEKTIF</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;600;700&family=Orbitron:wght@500;700;900&family=Prompt:wght@400;600&family=Rajdhani:wght@600;700&display=swap" rel="stylesheet">
+    
+    <!-- MediaPipe Hands CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+    <style>
+        body {
+            font-family: 'Prompt', sans-serif;
+            background-color: #030712;
+            color: #f3f4f6;
+            overflow: hidden;
+            user-select: none;
+        }
+        .font-orbitron { font-family: 'Orbitron', sans-serif; }
+        .font-rajdhani { font-family: 'Rajdhani', sans-serif; }
+        .font-kanit { font-family: 'Kanit', sans-serif; }
+
+        /* Sci-Fi Glassmorphism */
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(56, 189, 248, 0.2);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+        }
+        .glass-panel-glow {
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(6, 182, 212, 0.5);
+            box-shadow: 0 0 20px rgba(6, 182, 212, 0.3);
+        }
+
+        /* Animations & FX */
+        @keyframes pulse-slow {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.8; transform: scale(1.02); }
+        }
+        .animate-pulse-slow { animation: pulse-slow 3s infinite ease-in-out; }
+
+        @keyframes scanline {
+            0% { transform: translateY(-100%); }
+            100% { transform: translateY(100vh); }
+        }
+        .scanline {
+            position: absolute;
+            top: 0; left: 0; right: 0; height: 10px;
+            background: linear-gradient(to bottom, transparent, rgba(6, 182, 212, 0.4), transparent);
+            animation: scanline 4s linear infinite;
+            pointer-events: none;
+        }
+
+        /* Screen Shake */
+        .shake {
+            animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both;
+        }
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-2px, 0, 0); }
+            20%, 80% { transform: translate3d(4px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-6px, 0, 0); }
+            40%, 60% { transform: translate3d(6px, 0, 0); }
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.6); }
+        ::-webkit-scrollbar-thumb { background: #06b6d4; border-radius: 3px; }
+    </style>
+</head>
+<body class="w-screen h-screen relative overflow-hidden bg-slate-950">
+
+    <!-- Video Element (Hidden webcam feed) -->
+    <video id="webcam" class="hidden" playsinline></video>
+
+    <!-- Main Canvas for Cyber City Background, Drones, Hands, and FX -->
+    <canvas id="gameCanvas" class="absolute inset-0 w-full h-full z-0"></canvas>
+    <div class="scanline z-10"></div>
+
+    <!-- UI LAYER (HUD & Overlays) -->
+    <div id="uiLayer" class="absolute inset-0 z-20 pointer-events-none flex flex-col justify-between p-4 md:p-6">
+        
+        <!-- TOP HUD -->
+        <header class="flex justify-between items-center w-full max-w-7xl mx-auto">
+            <!-- Left: Mission Progress -->
+            <div class="glass-panel px-4 py-2 rounded-xl flex items-center space-x-3 border-l-4 border-cyan-500">
+                <div>
+                    <div class="text-[10px] tracking-widest text-cyan-400 font-orbitron">MISSION PROGRESS</div>
+                    <div class="text-xs text-slate-300 font-bold uppercase">KATA ADJEKTIF</div>
+                </div>
+                <div class="text-xl font-orbitron font-bold text-cyan-300" id="hudProgress">00/15</div>
+            </div>
+
+            <!-- Center: Target Instruction Banner -->
+            <div class="glass-panel-glow px-6 py-3 rounded-2xl text-center border-t-2 border-b-2 border-cyan-400 max-w-lg w-full mx-2">
+                <div id="hudInstructionLabel" class="text-xs text-cyan-400 font-orbitron font-semibold tracking-wider uppercase">SASARAN UTAMA</div>
+                <div id="hudInstructionText" class="text-lg md:text-2xl font-bold font-kanit text-white tracking-wide drop-shadow-[0_0_10px_rgba(6,182,212,0.8)]">
+                    KATA ADJEKTIF JARAK
+                </div>
+            </div>
+
+            <!-- Right: Tactical Score & Combo -->
+            <div class="glass-panel px-4 py-2 rounded-xl text-right border-r-4 border-purple-500">
+                <div class="text-[10px] tracking-widest text-purple-400 font-orbitron">TACTICAL SCORE</div>
+                <div class="flex items-center justify-end space-x-2">
+                    <span id="hudCombo" class="text-xs font-bold font-orbitron text-amber-400 bg-amber-950/80 px-2 py-0.5 rounded border border-amber-500">x1</span>
+                    <span id="hudScore" class="text-xl font-orbitron font-bold text-purple-300">0000</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- CENTER FEEDBACK MODAL (Toast Notification) -->
+        <div id="feedbackToast" class="self-center glass-panel-glow px-8 py-4 rounded-2xl text-center transform scale-0 transition-transform duration-300 border-2 border-cyan-400">
+            <div id="toastTitle" class="text-2xl font-orbitron font-extrabold text-cyan-300 uppercase">BETUL!</div>
+            <div id="toastMessage" class="text-base font-prompt text-slate-200 mt-1">"DEKAT" ialah Kata Adjektif Jarak.</div>
+            <div id="toastExample" class="text-xs italic text-cyan-200/80 mt-1">Rumah saya dekat dengan sekolah.</div>
+        </div>
+
+        <!-- BOTTOM HUD: AI NOVA Guidance -->
+        <footer class="w-full max-w-4xl mx-auto">
+            <div class="glass-panel px-5 py-3 rounded-2xl flex items-center space-x-4 border-b-2 border-cyan-500/50">
+                <div class="relative flex-shrink-0">
+                    <div class="w-10 h-10 rounded-full bg-cyan-900/80 border border-cyan-400 flex items-center justify-center font-orbitron text-cyan-300 font-bold text-xs shadow-[0_0_12px_rgba(6,182,212,0.6)]">
+                        AI
+                    </div>
+                    <span class="absolute bottom-0 right-0 w-3 h-3 bg-emerald-400 rounded-full border-2 border-slate-900 animate-ping"></span>
+                    <span class="absolute bottom-0 right-0 w-3 h-3 bg-emerald-400 rounded-full border-2 border-slate-900"></span>
+                </div>
+                <div class="flex-grow">
+                    <div class="text-[10px] font-orbitron text-cyan-400 tracking-wider">A.I. NOVA ASSISTANT</div>
+                    <div id="aiNovaText" class="text-xs md:text-sm text-slate-200 font-prompt">Buka tapak tangan untuk mengaktifkan sistem pengesanan sasaran.</div>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- MODALS OVERLAY LAYER -->
+    <div id="modalLayer" class="absolute inset-0 z-30 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4">
+        
+        <!-- 1. START MODAL -->
+        <div id="startModal" class="glass-panel-glow max-w-xl w-full p-6 md:p-8 rounded-3xl border-2 border-cyan-500/60 text-center animate-pulse-slow">
+            <h1 class="text-3xl md:text-4xl font-orbitron font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-teal-200 to-purple-400 tracking-wider">
+                CYBER HUNTER
+            </h1>
+            <p class="text-sm font-orbitron text-cyan-300 mt-1 tracking-widest uppercase">MISI KATA ADJEKTIF</p>
+            
+            <div class="my-6 p-4 bg-slate-900/80 rounded-2xl border border-cyan-900/50 text-left space-y-2 text-xs md:text-sm text-slate-300">
+                <p class="font-bold text-cyan-400">Cara Bermain:</p>
+                <ol class="list-decimal list-inside space-y-1 text-slate-300">
+                    <li>Angkat tangan ke arah kamera.</li>
+                    <li>Buka tapak tangan untuk mengaktifkan Cyber Gauntlet.</li>
+                    <li>Halakan tapak tangan ke arah drone jawapan yang betul.</li>
+                    <li>Tunggu pengecasan 0.75s untuk menembak sasaran!</li>
+                </ol>
+                <div class="mt-3 p-2 bg-slate-800/80 rounded border border-slate-700 text-center font-kanit">
+                    <span class="text-amber-300 font-bold">Mod Fallback:</span> Sentuh / Klik drone jika tiada kamera.
+                </div>
+            </div>
+
+            <div class="flex flex-col sm:flex-row gap-3">
+                <button id="btnStartGame" class="flex-1 py-3 px-6 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-orbitron font-bold rounded-xl shadow-lg shadow-cyan-500/30 transition transform hover:scale-105 active:scale-95">
+                    MULA MISI
+                </button>
+                <button id="btnOpenLab" class="py-3 px-6 bg-purple-900/60 hover:bg-purple-800/80 border border-purple-500/50 text-purple-200 font-orbitron font-bold rounded-xl transition">
+                    ADJECTIVE LAB
+                </button>
+            </div>
+        </div>
+
+        <!-- 2. LOADING MODAL -->
+        <div id="loadingModal" class="hidden glass-panel max-w-md w-full p-8 rounded-3xl text-center border border-cyan-500">
+            <div class="w-16 h-16 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <h2 class="text-lg font-orbitron font-bold text-cyan-300">CONNECTING TO CYBER VISION...</h2>
+            <p id="loadingStatusText" class="text-xs text-slate-400 mt-2">Mengaktifkan sistem pengesanan tangan MediaPipe...</p>
+        </div>
+
+        <!-- 3. CAMERA ERROR MODAL -->
+        <div id="cameraErrorModal" class="hidden glass-panel max-w-md w-full p-6 rounded-3xl text-center border-2 border-red-500">
+            <div class="text-red-400 font-orbitron font-bold text-xl mb-2">AKSES KAMERA DITOLAK / GAGAL</div>
+            <p class="text-xs text-slate-300 mb-6">Sistem kamera tidak ditemui atau kebenaran ditolak. Mod Kawalan Tetikus / Sentuhan telah diaktifkan secara automatik.</p>
+            <button id="btnErrorContinue" class="w-full py-3 bg-red-600 hover:bg-red-500 text-white font-orbitron font-bold rounded-xl">
+                TERUSKAN DENGAN TETIKUS
+            </button>
+        </div>
+
+        <!-- 4. VICTORY MODAL -->
+        <div id="victoryModal" class="hidden glass-panel-glow max-w-2xl w-full p-6 md:p-8 rounded-3xl border-2 border-amber-400 text-center max-h-[90vh] overflow-y-auto">
+            <div class="text-amber-400 font-orbitron font-black text-2xl md:text-3xl tracking-widest animate-bounce">
+                MISSION COMPLETE!
+            </div>
+            <div class="text-sm font-kanit text-cyan-300 mt-1">SYABAS! KAMU ADALAH MASTER KATA ADJEKTIF</div>
+
+            <!-- Stars -->
+            <div class="flex justify-center my-4 space-x-2 text-3xl text-amber-400" id="starContainer">
+                <span>★</span><span>★</span><span>★</span>
+            </div>
+
+            <!-- Stats -->
+            <div class="grid grid-cols-3 gap-2 my-4 text-center">
+                <div class="bg-slate-900/80 p-2 rounded-xl border border-slate-700">
+                    <div class="text-[10px] text-slate-400 font-orbitron">SKOR AKHIR</div>
+                    <div id="vicScore" class="text-lg font-bold font-orbitron text-cyan-300">0000</div>
+                </div>
+                <div class="bg-slate-900/80 p-2 rounded-xl border border-slate-700">
+                    <div class="text-[10px] text-slate-400 font-orbitron">MAX COMBO</div>
+                    <div id="vicCombo" class="text-lg font-bold font-orbitron text-amber-400">x1</div>
+                </div>
+                <div class="bg-slate-900/80 p-2 rounded-xl border border-slate-700">
+                    <div class="text-[10px] text-slate-400 font-orbitron">TERSASAR</div>
+                    <div id="vicMiss" class="text-lg font-bold font-orbitron text-red-400">0</div>
+                </div>
+            </div>
+
+            <!-- Learning Summary -->
+            <div class="text-left bg-slate-900/90 p-4 rounded-2xl border border-cyan-900 max-h-48 overflow-y-auto mb-6 text-xs text-slate-300 space-y-3">
+                <div class="font-bold text-cyan-400 border-b border-cyan-800 pb-1 font-orbitron">RINGKASAN PEMBELAJARAN</div>
+                <div>
+                    <span class="text-cyan-300 font-semibold">JARAK:</span> dekat, jauh, hampir, rapat, jauh sekali.
+                </div>
+                <div>
+                    <span class="text-emerald-300 font-semibold">PANCAINDERA:</span> manis, masin, harum, busuk, cantik, merdu, lembut, kasar.
+                </div>
+                <div>
+                    <span class="text-purple-300 font-semibold">PERASAAN:</span> gembira, sedih, marah, takut, risau, kecewa, bangga, malu.
+                </div>
+            </div>
+
+            <!-- Buttons -->
+            <div class="flex flex-col sm:flex-row gap-2">
+                <button id="btnRestart" class="flex-1 py-3 bg-cyan-600 hover:bg-cyan-500 font-orbitron font-bold rounded-xl text-white">MAIN SEMULA</button>
+                <button id="btnReviewLab" class="flex-1 py-3 bg-purple-600 hover:bg-purple-500 font-orbitron font-bold rounded-xl text-white">ULANG KAJI</button>
+            </div>
+        </div>
+
+        <!-- 5. ADJECTIVE LAB / REVISION MODAL -->
+        <div id="labModal" class="hidden glass-panel-glow max-w-3xl w-full p-6 rounded-3xl border-2 border-purple-500 max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center border-b border-purple-800/80 pb-3 mb-4">
+                <h2 class="text-xl font-orbitron font-bold text-purple-300">ADJECTIVE LAB (MOD ULANG KAJI)</h2>
+                <button id="btnCloseLab" class="text-slate-400 hover:text-white font-bold text-xl px-2">✕</button>
+            </div>
+
+            <!-- Lab Category Tabs -->
+            <div class="flex space-x-2 mb-4">
+                <button id="tabJarak" class="lab-tab flex-1 py-2 rounded-xl font-orbitron font-bold text-xs bg-cyan-900/60 text-cyan-200 border border-cyan-500">JARAK</button>
+                <button id="tabPancaindera" class="lab-tab flex-1 py-2 rounded-xl font-orbitron font-bold text-xs bg-slate-800 text-slate-400 border border-slate-700">PANCAINDERA</button>
+                <button id="tabPerasaan" class="lab-tab flex-1 py-2 rounded-xl font-orbitron font-bold text-xs bg-slate-800 text-slate-400 border border-slate-700">PERASAAN</button>
+            </div>
+
+            <!-- Lab Word Cards Grid -->
+            <div id="labCardsContainer" class="grid grid-cols-1 sm:grid-cols-2 gap-3 overflow-y-auto flex-grow p-1">
+                <!-- Dynamic insertion -->
+            </div>
+        </div>
+
+    </div>
+
+    <!-- JAVASCRIPT LOGIC -->
+    <script>
+        /* ==========================================================================
+           1. DATA KATA ADJEKTIF & MUKTAMAD
+           ========================================================================== */
+        const DATABASE = {
+            JARAK: [
+                { word: 'dekat', mean: 'jarak yang tidak jauh', icon: '🏠🏠', sentence: 'Sekolah itu dekat dengan rumah saya.' },
+                { word: 'jauh', mean: 'jarak yang tidak dekat', icon: '📍...📍', sentence: 'Kampung itu jauh dari bandar.' },
+                { word: 'hampir', mean: 'berada pada jarak yang dekat', icon: '🎯', sentence: 'Sekolah itu hampir dengan rumahnya.' },
+                { word: 'rapat', mean: 'mempunyai jarak yang sangat dekat', icon: '🤝', sentence: 'Kedua-dua rumah itu sangat rapat.' },
+                { word: 'jauh sekali', mean: 'mempunyai jarak yang sangat jauh', icon: '🌌', sentence: 'Tempat itu jauh sekali dari sini.' }
+            ],
+            PANCAINDERA: [
+                { word: 'manis', mean: 'rasa lidah (gula/kek)', icon: '🍰', sentence: 'Kuih itu sangat manis.' },
+                { word: 'masin', mean: 'rasa lidah (garam)', icon: '🧂', sentence: 'Sup itu terlalu masin.' },
+                { word: 'harum', mean: 'bau yang menyenangkan', icon: '🌸', sentence: 'Bunga itu berbau harum.' },
+                { word: 'busuk', mean: 'bau yang tidak enak', icon: '🗑️', sentence: 'Sampah itu berbau busuk.' },
+                { word: 'cantik', mean: 'pandangan mata yang indah', icon: '🌺', sentence: 'Pemandangan itu sangat cantik.' },
+                { word: 'merdu', mean: 'pendengaran telinga yang sedap', icon: '🎵', sentence: 'Suara penyanyi itu merdu.' },
+                { word: 'lembut', mean: 'sentuhan kulit yang gebu', icon: '🛋️', sentence: 'Bantal itu lembut.' },
+                { word: 'kasar', mean: 'sentuhan kulit yang tidak rata', icon: '🪨', sentence: 'Permukaan batu itu kasar.' }
+            ],
+            PERASAAN: [
+                { word: 'gembira', mean: 'berasa senang hati', icon: '😊', sentence: 'Aina berasa gembira kerana mendapat hadiah.' },
+                { word: 'sedih', mean: 'berasa dukacita', icon: '😢', sentence: 'Aina berasa sedih.' },
+                { word: 'marah', mean: 'berasa tidak puas hati', icon: '😡', sentence: 'Ibu berasa marah.' },
+                { word: 'takut', mean: 'berasa gerun', icon: '😨', sentence: 'Amir berasa takut ketika melihat anjing itu.' },
+                { word: 'risau', mean: 'berasa bimbang', icon: '😟', sentence: 'Ayah berasa risau.' },
+                { word: 'kecewa', mean: 'berasa hampa', icon: '😞', sentence: 'Amir berasa kecewa.' },
+                { word: 'bangga', mean: 'berasa megah', icon: '🏆', sentence: 'Guru berasa bangga.' },
+                { word: 'malu', mean: 'berasa segan', icon: '😳', sentence: 'Siti berasa malu.' }
+            ]
+        };
+
+        /* ==========================================================================
+           2. PROCEDURAL SOUND SYNTHESIZER (Web Audio API)
+           ========================================================================== */
+        class SoundFX {
+            constructor() {
+                this.ctx = null;
+            }
+            init() {
+                if (!this.ctx) {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+            }
+            playLock() {
+                if (!this.ctx) return;
+                let osc = this.ctx.createOscillator();
+                let gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(800, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(1200, this.ctx.currentTime + 0.08);
+                gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.08);
+                osc.connect(gain); gain.connect(this.ctx.destination);
+                osc.start(); osc.stop(this.ctx.currentTime + 0.08);
+            }
+            playFire() {
+                if (!this.ctx) return;
+                let osc = this.ctx.createOscillator();
+                let gain = this.ctx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(600, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(80, this.ctx.currentTime + 0.25);
+                gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.25);
+                osc.connect(gain); gain.connect(this.ctx.destination);
+                osc.start(); osc.stop(this.ctx.currentTime + 0.25);
+            }
+            playExplode() {
+                if (!this.ctx) return;
+                let osc = this.ctx.createOscillator();
+                let gain = this.ctx.createGain();
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(120, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(30, this.ctx.currentTime + 0.3);
+                gain.gain.setValueAtTime(0.4, this.ctx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.3);
+                osc.connect(gain); gain.connect(this.ctx.destination);
+                osc.start(); osc.stop(this.ctx.currentTime + 0.3);
+            }
+            playDeflect() {
+                if (!this.ctx) return;
+                let osc = this.ctx.createOscillator();
+                let gain = this.ctx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, this.ctx.currentTime);
+                osc.frequency.setValueAtTime(100, this.ctx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.2);
+                osc.connect(gain); gain.connect(this.ctx.destination);
+                osc.start(); osc.stop(this.ctx.currentTime + 0.2);
+            }
+            playVictory() {
+                if (!this.ctx) return;
+                let notes = [523.25, 659.25, 783.99, 1046.50];
+                notes.forEach((freq, idx) => {
+                    let osc = this.ctx.createOscillator();
+                    let gain = this.ctx.createGain();
+                    osc.frequency.value = freq;
+                    gain.gain.setValueAtTime(0.2, this.ctx.currentTime + idx * 0.1);
+                    gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + idx * 0.1 + 0.3);
+                    osc.connect(gain); gain.connect(this.ctx.destination);
+                    osc.start(this.ctx.currentTime + idx * 0.1);
+                    osc.stop(this.ctx.currentTime + idx * 0.1 + 0.3);
+                });
+            }
+        }
+        const sfx = new SoundFX();
+
+        /* ==========================================================================
+           3. GAME ENGINE & STATE MANAGEMENT
+           ========================================================================== */
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let gameState = {
+            active: false,
+            score: 0,
+            combo: 1,
+            maxCombo: 1,
+            missCount: 0,
+            missionIndex: 0,
+            totalMissions: 15,
+            currentMission: null,
+            handPos: { x: -100, y: -100 },
+            isPalmOpen: false,
+            lockedDrone: null,
+            chargeTimer: 0,
+            chargeThreshold: 45, // ~0.75s @ 60fps
+            drones: [],
+            particles: [],
+            laserBeam: null,
+            screenShake: 0
+        };
+
+        // Resize Canvas
+        function resizeCanvas() {
+            canvas.width = window.innerWidth * window.devicePixelRatio;
+            canvas.height = window.innerHeight * window.devicePixelRatio;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        /* ==========================================================================
+           4. DRONE CLASS
+           ========================================================================== */
+        class Drone {
+            constructor(x, y, wordObj, category) {
+                this.x = x;
+                this.y = y;
+                this.baseY = y;
+                this.wordObj = wordObj;
+                this.category = category;
+                this.radius = 55;
+                this.floatOffset = Math.random() * Math.PI * 2;
+                this.vx = (Math.random() - 0.5) * 1.5;
+                this.shieldAlpha = 0;
+            }
+
+            update() {
+                this.floatOffset += 0.03;
+                this.y = this.baseY + Math.sin(this.floatOffset) * 12;
+                this.x += this.vx;
+
+                // Bounce off canvas edges
+                const margin = 80;
+                if (this.x < margin || this.x > (canvas.width / window.devicePixelRatio) - margin) {
+                    this.vx *= -1;
+                }
+            }
+
+            draw(c, isLocked, chargeRatio) {
+                const px = this.x * window.devicePixelRatio;
+                const py = this.y * window.devicePixelRatio;
+                const r = this.radius * window.devicePixelRatio;
+
+                c.save();
+                c.translate(px, py);
+
+                // Quadcopter Rotor Arms
+                c.strokeStyle = '#475569';
+                c.lineWidth = 4 * window.devicePixelRatio;
+                c.beginPath();
+                c.moveTo(-r, -r); c.lineTo(r, r);
+                c.moveTo(r, -r); c.lineTo(-r, r);
+                c.stroke();
+
+                // Rotors
+                c.fillStyle = '#06b6d4';
+                const rotTime = Date.now() * 0.02;
+                [-r, r].forEach(rx => {
+                    [-r, r].forEach(ry => {
+                        c.save();
+                        c.translate(rx, ry);
+                        c.rotate(rotTime);
+                        c.beginPath();
+                        c.ellipse(0, 0, 15 * window.devicePixelRatio, 4 * window.devicePixelRatio, 0, 0, Math.PI * 2);
+                        c.fill();
+                        c.restore();
+                    });
+                });
+
+                // Body Core Glassmorphism / Neon
+                c.fillStyle = isLocked ? '#0f172a' : '#1e293b';
+                c.strokeStyle = isLocked ? '#06b6d4' : '#64748b';
+                c.lineWidth = (isLocked ? 4 : 2) * window.devicePixelRatio;
+                if (isLocked) {
+                    c.shadowColor = '#06b6d4';
+                    c.shadowBlur = 15 * window.devicePixelRatio;
+                }
+                c.beginPath();
+                c.arc(0, 0, r * 0.8, 0, Math.PI * 2);
+                c.fill();
+                c.stroke();
+
+                // Lock Reticle & Charge Ring
+                if (isLocked) {
+                    c.strokeStyle = '#f59e0b';
+                    c.lineWidth = 3 * window.devicePixelRatio;
+                    c.beginPath();
+                    c.arc(0, 0, r * 0.95, -Math.PI / 2, (-Math.PI / 2) + (Math.PI * 2 * chargeRatio));
+                    c.stroke();
+                }
+
+                // Wrong Answer Shield Flash
+                if (this.shieldAlpha > 0) {
+                    c.fillStyle = `rgba(239, 68, 68, ${this.shieldAlpha})`;
+                    c.beginPath();
+                    c.arc(0, 0, r * 1.1, 0, Math.PI * 2);
+                    c.fill();
+                    this.shieldAlpha -= 0.05;
+                }
+
+                // Word Text & Icon
+                c.shadowBlur = 0;
+                c.textAlign = 'center';
+                c.textBaseline = 'middle';
+                
+                c.font = `bold ${14 * window.devicePixelRatio}px Prompt`;
+                c.fillStyle = '#94a3b8';
+                c.fillText(this.wordObj.icon || '', 0, -r * 0.3);
+
+                c.font = `bold ${18 * window.devicePixelRatio}px Kanit`;
+                c.fillStyle = '#ffffff';
+                c.fillText(this.wordObj.word.toUpperCase(), 0, r * 0.2);
+
+                c.restore();
+            }
+        }
+
+        /* ==========================================================================
+           5. GENERATE MISSIONS & DRONE SPAWNING
+           ========================================================================== */
+        const MISSION_TYPES = ['TYPE_MATCH', 'WORD_MATCH', 'SENTENCE_MATCH'];
+
+        function generateMission() {
+            const categories = ['JARAK', 'PANCAINDERA', 'PERASAAN'];
+            const targetCat = categories[Math.floor(Math.random() * categories.length)];
+            const type = MISSION_TYPES[Math.floor(Math.random() * MISSION_TYPES.length)];
+
+            const targetPool = DATABASE[targetCat];
+            const correctWordObj = targetPool[Math.floor(Math.random() * targetPool.length)];
+
+            // Pick 3 distractor words from other categories or same category
+            let distractors = [];
+            while (distractors.length < 3) {
+                const randCat = categories[Math.floor(Math.random() * categories.length)];
+                const randPool = DATABASE[randCat];
+                const randWord = randPool[Math.floor(Math.random() * randPool.length)];
+                if (randWord.word !== correctWordObj.word && !distractors.some(d => d.word.word === randWord.word)) {
+                    distractors.push({ word: randWord, category: randCat });
+                }
+            }
+
+            const options = [{ word: correctWordObj, category: targetCat }, ...distractors];
+            // Shuffle
+            options.sort(() => Math.random() - 0.5);
+
+            return {
+                type,
+                targetCategory: targetCat,
+                correctWordObj,
+                options
+            };
+        }
+
+        function loadNextMission() {
+            if (gameState.missionIndex >= gameState.totalMissions) {
+                endGame();
+                return;
+            }
+
+            gameState.missionIndex++;
+            gameState.currentMission = generateMission();
+            const m = gameState.currentMission;
+
+            // UI HUD Updates
+            document.getElementById('hudProgress').innerText = `${String(gameState.missionIndex).padStart(2, '0')}/${gameState.totalMissions}`;
+
+            const labelEl = document.getElementById('hudInstructionLabel');
+            const textEl = document.getElementById('hudInstructionText');
+
+            if (m.type === 'TYPE_MATCH') {
+                labelEl.innerText = 'MISI A: CARI KATA ADJEKTIF';
+                textEl.innerText = `SASARAN: KATA ADJEKTIF ${m.targetCategory}`;
+            } else if (m.type === 'WORD_MATCH') {
+                labelEl.innerText = 'MISI B: KENAL PASTI KATEGORI';
+                textEl.innerText = `SASARAN: PERKATAAN (${m.targetCategory})`;
+            } else {
+                labelEl.innerText = 'MISI C: KENAL PASTI DALAM AYAT';
+                textEl.innerText = `"${m.correctWordObj.sentence}"`;
+            }
+
+            // Spawn Drones
+            gameState.drones = [];
+            const w = canvas.width / window.devicePixelRatio;
+            const h = canvas.height / window.devicePixelRatio;
+            const spacing = w / (m.options.length + 1);
+
+            m.options.forEach((opt, idx) => {
+                const x = spacing * (idx + 1);
+                const y = h * 0.45 + (Math.random() * 60 - 30);
+                gameState.drones.push(new Drone(x, y, opt.word, opt.category));
+            });
+
+            updateAInova("Sistem bersedia. Halakan tapak tangan ke arah drone sasaran.");
+        }
+
+        /* ==========================================================================
+           6. RENDER LOOP (CYBER CITY, GAUNTLET, PARTICLES)
+           ========================================================================== */
+        function drawCyberBackground(c) {
+            const w = canvas.width;
+            const h = canvas.height;
+
+            // Gradient Sky
+            let grad = c.createLinearGradient(0, 0, 0, h);
+            grad.addColorStop(0, '#020617');
+            grad.addColorStop(0.5, '#0f172a');
+            grad.addColorStop(1, '#1e1b4b');
+            c.fillStyle = grad;
+            c.fillRect(0, 0, w, h);
+
+            // Holographic Horizon Grid
+            c.strokeStyle = 'rgba(6, 182, 212, 0.15)';
+            c.lineWidth = 1;
+            const horizon = h * 0.7;
+            for (let x = 0; x < w; x += 60) {
+                c.beginPath();
+                c.moveTo(x, horizon);
+                c.lineTo((x - w / 2) * 3 + w / 2, h);
+                c.stroke();
+            }
+            for (let y = horizon; y < h; y += 20) {
+                c.beginPath();
+                c.moveTo(0, y);
+                c.lineTo(w, y);
+                c.stroke();
+            }
+        }
+
+        function drawCyberGauntlet(c, pos, isOpen) {
+            const px = pos.x * window.devicePixelRatio;
+            const py = pos.y * window.devicePixelRatio;
+
+            c.save();
+            c.translate(px, py);
+
+            // Glowing Arc Core Center
+            c.shadowColor = isOpen ? '#06b6d4' : '#64748b';
+            c.shadowBlur = isOpen ? 25 * window.devicePixelRatio : 5;
+            c.fillStyle = isOpen ? '#22d3ee' : '#475569';
+            c.beginPath();
+            c.arc(0, 0, 22 * window.devicePixelRatio, 0, Math.PI * 2);
+            c.fill();
+
+            // Outer Mechanical Ring
+            c.strokeStyle = isOpen ? '#a5f3fc' : '#94a3b8';
+            c.lineWidth = 3 * window.devicePixelRatio;
+            c.beginPath();
+            c.arc(0, 0, 35 * window.devicePixelRatio, 0, Math.PI * 2);
+            c.stroke();
+
+            // Circuit Lines
+            for (let i = 0; i < 4; i++) {
+                const angle = (Math.PI / 2) * i + (Date.now() * 0.002);
+                c.beginPath();
+                c.moveTo(Math.cos(angle) * 35 * window.devicePixelRatio, Math.sin(angle) * 35 * window.devicePixelRatio);
+                c.lineTo(Math.cos(angle) * 50 * window.devicePixelRatio, Math.sin(angle) * 50 * window.devicePixelRatio);
+                c.stroke();
+            }
+
+            c.restore();
+        }
+
+        function triggerExplosion(x, y) {
+            for (let i = 0; i < 30; i++) {
+                gameState.particles.push({
+                    x, y,
+                    vx: (Math.random() - 0.5) * 12,
+                    vy: (Math.random() - 0.5) * 12,
+                    size: Math.random() * 6 + 2,
+                    alpha: 1,
+                    color: ['#06b6d4', '#38bdf8', '#f59e0b', '#ffffff'][Math.floor(Math.random() * 4)]
+                });
+            }
+        }
+
+        function gameLoop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Screen Shake Effect
+            if (gameState.screenShake > 0) {
+                ctx.save();
+                const dx = (Math.random() - 0.5) * gameState.screenShake;
+                const dy = (Math.random() - 0.5) * gameState.screenShake;
+                ctx.translate(dx, dy);
+                gameState.screenShake *= 0.85;
+                if (gameState.screenShake < 0.5) gameState.screenShake = 0;
+            }
+
+            drawCyberBackground(ctx);
+
+            // Update & Render Drones
+            if (gameState.active) {
+                let currentClosest = null;
+                let minDistance = 9999;
+
+                const handX = gameState.handPos.x;
+                const handY = gameState.handPos.y;
+
+                gameState.drones.forEach(drone => {
+                    drone.update();
+
+                    // Check distance to hand/pointer
+                    const dist = Math.hypot(drone.x - handX, drone.y - handY);
+                    if (dist < drone.radius + 40 && dist < minDistance) {
+                        minDistance = dist;
+                        currentClosest = drone;
+                    }
+                });
+
+                // Target Lock Logic
+                if (currentClosest && gameState.isPalmOpen) {
+                    if (gameState.lockedDrone !== currentClosest) {
+                        gameState.lockedDrone = currentClosest;
+                        gameState.chargeTimer = 0;
+                        sfx.playLock();
+                        updateAInova("Sasaran dikunci. Mengecas tenaga...");
+                    } else {
+                        gameState.chargeTimer++;
+                        if (gameState.chargeTimer >= gameState.chargeThreshold) {
+                            // FIRE!
+                            fireLaserAt(gameState.lockedDrone);
+                            gameState.chargeTimer = 0;
+                        }
+                    }
+                } else {
+                    if (gameState.lockedDrone) {
+                        gameState.lockedDrone = null;
+                        gameState.chargeTimer = 0;
+                    }
+                }
+
+                // Render Drones
+                gameState.drones.forEach(drone => {
+                    const isLocked = (drone === gameState.lockedDrone);
+                    const ratio = isLocked ? (gameState.chargeTimer / gameState.chargeThreshold) : 0;
+                    drone.draw(ctx, isLocked, ratio);
+                });
+
+                // Render Particles
+                for (let i = gameState.particles.length - 1; i >= 0; i--) {
+                    let p = gameState.particles[i];
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.alpha -= 0.03;
+                    if (p.alpha <= 0) {
+                        gameState.particles.splice(i, 1);
+                        continue;
+                    }
+                    ctx.save();
+                    ctx.globalAlpha = p.alpha;
+                    ctx.fillStyle = p.color;
+                    ctx.beginPath();
+                    ctx.arc(p.x * window.devicePixelRatio, p.y * window.devicePixelRatio, p.size * window.devicePixelRatio, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                }
+
+                // Render Laser Beam FX
+                if (gameState.laserBeam) {
+                    const b = gameState.laserBeam;
+                    ctx.save();
+                    ctx.strokeStyle = '#22d3ee';
+                    ctx.lineWidth = 12 * window.devicePixelRatio;
+                    ctx.shadowColor = '#06b6d4';
+                    ctx.shadowBlur = 20;
+                    ctx.beginPath();
+                    ctx.moveTo(b.x1 * window.devicePixelRatio, b.y1 * window.devicePixelRatio);
+                    ctx.lineTo(b.x2 * window.devicePixelRatio, b.y2 * window.devicePixelRatio);
+                    ctx.stroke();
+                    ctx.restore();
+                    gameState.laserBeam.alpha -= 0.2;
+                    if (gameState.laserBeam.alpha <= 0) gameState.laserBeam = null;
+                }
+
+                // Render Cyber Gauntlet Pointer
+                if (gameState.handPos.x > 0) {
+                    drawCyberGauntlet(ctx, gameState.handPos, gameState.isPalmOpen);
+                }
+            }
+
+            if (gameState.screenShake > 0) ctx.restore();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        /* ==========================================================================
+           7. SHOOTING & ANSWER VALIDATION
+           ========================================================================== */
+        function fireLaserAt(drone) {
+            sfx.playFire();
+
+            // Visual Beam
+            gameState.laserBeam = {
+                x1: gameState.handPos.x,
+                y1: gameState.handPos.y,
+                x2: drone.x,
+                y2: drone.y,
+                alpha: 1.0
+            };
+
+            const mission = gameState.currentMission;
+            const isCorrect = (drone.wordObj.word === mission.correctWordObj.word);
+
+            if (isCorrect) {
+                sfx.playExplode();
+                triggerExplosion(drone.x, drone.y);
+
+                // Score Calculation
+                const baseScore = 100;
+                const earned = baseScore * gameState.combo;
+                gameState.score += earned;
+                if (gameState.combo > gameState.maxCombo) gameState.maxCombo = gameState.combo;
+                gameState.combo++;
+
+                // Update HUD
+                document.getElementById('hudScore').innerText = String(gameState.score).padStart(4, '0');
+                document.getElementById('hudCombo').innerText = `x${gameState.combo}`;
+
+                showToast('BETUL!', `"${drone.wordObj.word.toUpperCase()}" ialah Kata Adjektif ${drone.category}.`, drone.wordObj.sentence);
+                updateAInova("Tembakan tepat! Maklumat telah direkodkan.");
+
+                // Delay next mission
+                gameState.active = false;
+                setTimeout(() => {
+                    hideToast();
+                    gameState.active = true;
+                    loadNextMission();
+                }, 1800);
+
+            } else {
+                sfx.playDeflect();
+                drone.shieldAlpha = 0.8;
+                gameState.screenShake = 15;
+
+                // Reset Combo & Increment Miss
+                gameState.combo = 1;
+                gameState.missCount++;
+                document.getElementById('hudCombo').innerText = `x1`;
+
+                showToast('BUKAN SASARAN', `"${drone.wordObj.word.toUpperCase()}" ialah Kata Adjektif ${drone.category}.`, `Sasaran sebenar ialah Kata Adjektif ${mission.targetCategory}.`);
+                updateAInova("Bukan sasaran! Sila semak semula jenis kata adjektif.");
+
+                setTimeout(() => {
+                    hideToast();
+                }, 1500);
+            }
+        }
+
+        /* ==========================================================================
+           8. UI TOAST & AI NOVA HELPERS
+           ========================================================================== */
+        function showToast(title, msg, ex) {
+            const toast = document.getElementById('feedbackToast');
+            document.getElementById('toastTitle').innerText = title;
+            document.getElementById('toastMessage').innerText = msg;
+            document.getElementById('toastExample').innerText = ex ? `Contoh: ${ex}` : '';
+            toast.classList.remove('scale-0');
+            toast.classList.add('scale-100');
+        }
+
+        function hideToast() {
+            const toast = document.getElementById('feedbackToast');
+            toast.classList.remove('scale-100');
+            toast.classList.add('scale-0');
+        }
+
+        function updateAInova(text) {
+            document.getElementById('aiNovaText').innerText = text;
+        }
+
+        /* ==========================================================================
+           9. MEDIAPIPE HAND TRACKING & FALLBACKS
+           ========================================================================== */
+        let hands = null;
+        let camera = null;
+
+        function initMediaPipe() {
+            const videoElement = document.getElementById('webcam');
+
+            hands = new Hands({
+                locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+            });
+
+            hands.setOptions({
+                maxNumHands: 1,
+                modelComplexity: 1,
+                minDetectionConfidence: 0.6,
+                minTrackingConfidence: 0.6
+            });
+
+            hands.onResults((results) => {
+                if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                    const lm = results.multiHandLandmarks[0];
+                    // Index finger tip (landmark 8) or palm center
+                    const x = (1 - lm[8].x) * (canvas.width / window.devicePixelRatio);
+                    const y = lm[8].y * (canvas.height / window.devicePixelRatio);
+
+                    gameState.handPos = { x, y };
+
+                    // Open Palm Detection: Check distance between wrist (0) and middle finger tip (12)
+                    const wrist = lm[0];
+                    const middleTip = lm[12];
+                    const dist = Math.hypot(wrist.x - middleTip.x, wrist.y - middleTip.y);
+                    gameState.isPalmOpen = dist > 0.35; // Threshold for open hand
+                } else {
+                    gameState.isPalmOpen = false;
+                }
+            });
+
+            camera = new Camera(videoElement, {
+                onFrame: async () => {
+                    await hands.send({ image: videoElement });
+                },
+                width: 640,
+                height: 480
+            });
+
+            camera.start().then(() => {
+                document.getElementById('loadingModal').classList.add('hidden');
+                document.getElementById('modalLayer').classList.add('hidden');
+                startGameLoop();
+            }).catch((err) => {
+                console.warn("Camera blocked or missing. Switching to fallback mode.", err);
+                document.getElementById('loadingModal').classList.add('hidden');
+                document.getElementById('cameraErrorModal').classList.remove('hidden');
+            });
+        }
+
+        // Fallback Mouse / Touch Controls
+        window.addEventListener('mousemove', (e) => {
+            if (!camera) {
+                gameState.handPos = { x: e.clientX, y: e.clientY };
+                gameState.isPalmOpen = true; // Always active in fallback mouse mode
+            }
+        });
+
+        window.addEventListener('click', (e) => {
+            if (!camera && gameState.active) {
+                gameState.handPos = { x: e.clientX, y: e.clientY };
+                // Find clicked drone directly
+                const clicked = gameState.drones.find(d => Math.hypot(d.x - e.clientX, d.y - e.clientY) < d.radius + 20);
+                if (clicked) {
+                    fireLaserAt(clicked);
+                }
+            }
+        });
+
+        /* ==========================================================================
+           10. GAME FLOW CONTROLLERS
+           ========================================================================== */
+        function startGameLoop() {
+            gameState.score = 0;
+            gameState.combo = 1;
+            gameState.maxCombo = 1;
+            gameState.missCount = 0;
+            gameState.missionIndex = 0;
+            gameState.active = true;
+
+            document.getElementById('hudScore').innerText = '0000';
+            document.getElementById('hudCombo').innerText = 'x1';
+
+            loadNextMission();
+        }
+
+        function endGame() {
+            gameState.active = false;
+            sfx.playVictory();
+
+            document.getElementById('modalLayer').classList.remove('hidden');
+            document.getElementById('victoryModal').classList.remove('hidden');
+
+            document.getElementById('vicScore').innerText = gameState.score;
+            document.getElementById('vicCombo').innerText = `x${gameState.maxCombo}`;
+            document.getElementById('vicMiss').innerText = gameState.missCount;
+
+            // Render Stars based on performance
+            const starContainer = document.getElementById('starContainer');
+            if (gameState.missCount <= 2) {
+                starContainer.innerHTML = '<span>★</span><span>★</span><span>★</span>';
+            } else if (gameState.missCount <= 5) {
+                starContainer.innerHTML = '<span>★</span><span>★</span><span class="text-slate-600">★</span>';
+            } else {
+                starContainer.innerHTML = '<span>★</span><span class="text-slate-600">★</span><span class="text-slate-600">★</span>';
+            }
+        }
+
+        /* ==========================================================================
+           11. ADJECTIVE LAB (MOD ULANG KAJI)
+           ========================================================================== */
+        function renderLabCategory(cat) {
+            const container = document.getElementById('labCardsContainer');
+            container.innerHTML = '';
+
+            DATABASE[cat].forEach(item => {
+                const card = document.createElement('div');
+                card.className = 'glass-panel p-4 rounded-2xl border border-purple-500/30 hover:border-cyan-400 transition transform hover:-translate-y-1';
+                card.innerHTML = `
+                    <div class="flex items-center space-x-3">
+                        <div class="text-3xl">${item.icon}</div>
+                        <div>
+                            <div class="text-lg font-bold font-kanit text-cyan-300 uppercase">${item.word}</div>
+                            <div class="text-xs text-slate-300">${item.mean}</div>
+                        </div>
+                    </div>
+                    <div class="mt-3 text-xs bg-slate-900/80 p-2 rounded-xl text-slate-300 italic border border-slate-800">
+                        "${item.sentence}"
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        // Lab Tabs Logic
+        document.getElementById('tabJarak').addEventListener('click', function() {
+            switchTab(this, 'JARAK');
+        });
+        document.getElementById('tabPancaindera').addEventListener('click', function() {
+            switchTab(this, 'PANCAINDERA');
+        });
+        document.getElementById('tabPerasaan').addEventListener('click', function() {
+            switchTab(this, 'PERASAAN');
+        });
+
+        function switchTab(btn, cat) {
+            document.querySelectorAll('.lab-tab').forEach(b => {
+                b.className = 'lab-tab flex-1 py-2 rounded-xl font-orbitron font-bold text-xs bg-slate-800 text-slate-400 border border-slate-700';
+            });
+            btn.className = 'lab-tab flex-1 py-2 rounded-xl font-orbitron font-bold text-xs bg-cyan-900/60 text-cyan-200 border border-cyan-500';
+            renderLabCategory(cat);
+        }
+
+        /* ==========================================================================
+           12. EVENT LISTENERS
+           ========================================================================== */
+        document.getElementById('btnStartGame').addEventListener('click', () => {
+            sfx.init();
+            document.getElementById('startModal').classList.add('hidden');
+            document.getElementById('loadingModal').classList.remove('hidden');
+            initMediaPipe();
+        });
+
+        document.getElementById('btnErrorContinue').addEventListener('click', () => {
+            document.getElementById('cameraErrorModal').classList.add('hidden');
+            document.getElementById('modalLayer').classList.add('hidden');
+            startGameLoop();
+        });
+
+        document.getElementById('btnRestart').addEventListener('click', () => {
+            document.getElementById('victoryModal').classList.add('hidden');
+            document.getElementById('modalLayer').classList.add('hidden');
+            startGameLoop();
+        });
+
+        document.getElementById('btnOpenLab').addEventListener('click', () => {
+            sfx.init();
+            document.getElementById('startModal').classList.add('hidden');
+            document.getElementById('labModal').classList.remove('hidden');
+            renderLabCategory('JARAK');
+        });
+
+        document.getElementById('btnReviewLab').addEventListener('click', () => {
+            document.getElementById('victoryModal').classList.add('hidden');
+            document.getElementById('labModal').classList.remove('hidden');
+            renderLabCategory('JARAK');
+        });
+
+        document.getElementById('btnCloseLab').addEventListener('click', () => {
+            document.getElementById('labModal').classList.add('hidden');
+            document.getElementById('startModal').classList.remove('hidden');
+        });
+
+        // Initialize Background Loop
+        requestAnimationFrame(gameLoop);
+    </script>
+</body>
+</html>
